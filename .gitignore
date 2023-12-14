@@ -1,0 +1,8 @@
+speaker_*/
+*.wav
+venv
+uploadedFile
+tempSlice
+web
+.vscode
+__pycache__
