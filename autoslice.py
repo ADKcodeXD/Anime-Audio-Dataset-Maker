@@ -1,71 +1,68 @@
 import os
-import shutil
 from pydub import AudioSegment
 from pyannote.audio import Pipeline
 import torch
-import numpy as np
-from pyannote.audio.pipelines import VoiceActivityDetection
-from pyannote.audio import Model
 from pyannote.audio.pipelines.utils.hook import ProgressHook
+from config import config
+import shutil
+import os
 
 
-def convert_seconds_with_decimal(seconds):
-    sec = int(seconds) // 1000
-    hours = int(sec) // 3600
+def convertMillisecondsToHMS(milliseconds):
+    seconds = milliseconds // 1000
+    hours = seconds // 3600
     seconds %= 3600
-    minutes = int(seconds) // 60
+    minutes = seconds // 60
     seconds %= 60
-    return f"{hours}h{minutes}m{seconds:.2f}s"
+    # 格式化输出为两位数字，不足两位数的前面补0
+    return f"{hours:02d}h{minutes:02d}m{seconds:02d}s"
 
 
-def save_speaker_audio(speaker, speaker_audio, speakerMap, start, end):
-    speaker_folder = f"tempSlice/speaker_{speaker}"
-    os.makedirs(speaker_folder, exist_ok=True)
-
+def saveSpeakerAudio(speaker, speakerAudio, speakerMap, start, end):
+    speakFolderPath = f"{config.get('tempSlicePath')}/speaker_{speaker}"
+    os.makedirs(speakFolderPath, exist_ok=True)
     if speakerMap.get(speaker) is None:
         speakerMap[speaker] = 0
     else:
         speakerMap[speaker] += 1
 
-    speaker_file = f"{speaker_folder}/{speakerMap.get(speaker)}_{speaker}_{convert_seconds_with_decimal(start)}-{convert_seconds_with_decimal(end)}.wav"
-    speaker_audio.export(speaker_file, format="wav")
+    speakerFile = f"{speakFolderPath}/{speakerMap.get(speaker)}_{speaker}_{convertMillisecondsToHMS(start)}-{convertMillisecondsToHMS(end)}.wav"
+    speakerAudio.export(speakerFile, format="wav")
 
 
-def diarize_and_slice(audio_path):
-    pipeline = Pipeline.from_pretrained(
-        "pyannote/speaker-diarization-3.1",
-        use_auth_token="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")
+def diarizeAndSlice(audio_path):
+    pipeline = Pipeline.from_pretrained("pyannote/speaker-diarization-3.1",
+                                        use_auth_token=config.get('hfToken'))
 
-    new_parameters = {'segmentation': {'min_duration_off': 0},
-                      'clustering': {'method': 'centroid',
-                                     'min_cluster_size': 15,
-                                     'threshold': 0.522}
-                      }
-    pipeline.instantiate(new_parameters)
+    newParams = config.get('pyannoteModelSetting')
+    pipeline.instantiate(newParams)
     pipeline.to(torch.device("cuda"))
 
     with ProgressHook() as hook:
         diarization = pipeline(
-            audio_path, min_speakers=2, max_speakers=16, hook=hook)
+            audio_path,
+            min_speakers=config.get('pyannoteSetting').get('min_speakers'),
+            max_speakers=config.get('pyannoteSetting').get('max_speakers'),
+            hook=hook)
 
     audio = AudioSegment.from_wav(audio_path)
-
     speakerMap = {}
 
-    # Process each detected speaker turn
+    if os.path.exists(config.get('tempSlicePath')):
+        shutil.rmtree(config.get('tempSlicePath'))
+        os.makedirs(config.get('tempSlicePath'))
+
     for turn, _, speaker in diarization.itertracks(yield_label=True):
         start = int(turn.start * 1000)
         end = int(turn.end * 1000)
         speaker_audio = audio[start:end]
 
-        if (end - start < 300):
+        if (end - start < int(config.get('minAudioLength'))):
             continue
         else:
-            save_speaker_audio(speaker, speaker_audio, speakerMap, start, end)
+            saveSpeakerAudio(speaker, speaker_audio, speakerMap, start, end)
 
 
-# Path to your audio file
-# audio_file_path = "./test.wav"
-
-# Run the diarization and slicing process
-# diarize_and_slice(audio_file_path)
+if __name__ == "__main__":
+    filePath = "./test_01.wav"
+    diarizeAndSlice(filePath)
