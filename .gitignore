@@ -1,8 +1,10 @@
 speaker_*/
 *.wav
 venv
+uploadedPath
 uploadedFile
 tempSlice
 web
 .vscode
 __pycache__
+speakerDataSet
