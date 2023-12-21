@@ -6,6 +6,45 @@ from pyannote.audio.pipelines.utils.hook import ProgressHook
 from config import config
 import shutil
 import os
+import pysubs2
+
+
+def loadsub(filePath, subOffset=0):
+    subs = pysubs2.load(filePath)
+    segments = []
+    noCommentSubs = [sub for sub in subs if not sub.is_comment]
+    for sub in noCommentSubs:
+        start = sub.start + subOffset
+        end = sub.end + subOffset
+        text = sub.plaintext
+        sameItem = next((item for item in segments if item['start'] == start),
+                        None)
+        if sameItem:
+            continue
+        segments.append({
+            'start': start,
+            'end': end,
+            'text': text,
+        })
+    return segments
+
+
+def splitAudioBySubtle(arr, audioPath):
+    # 分割好的
+    audio = AudioSegment.from_wav(audioPath)
+    result = []
+    for item in arr:
+        start = item.get('start')
+        end = item.get('end')
+        audioPart = audio[start:end]
+        result.append({
+            'audioPart': audioPart,
+            'text': item.get('text'),
+            'start': start,
+            'end': end
+        })
+
+    return result
 
 
 def convertMillisecondsToHMS(milliseconds):
@@ -30,7 +69,27 @@ def saveSpeakerAudio(speaker, speakerAudio, speakerMap, start, end):
     speakerAudio.export(speakerFile, format="wav")
 
 
-def diarizeAndSlice(audio_path):
+def loadAudioEverPartBySub(audioPath, subPath, subOffset):
+    arr = loadsub(subPath, subOffset)
+    subList = splitAudioBySubtle(arr, audioPath=audioPath)
+    return subList
+
+
+def findBestSpeaker(start, end, speakerMap):
+    bestSpeaker = None
+    longestOverlap = -1
+
+    for speaker, intervals in speakerMap.items():
+        for interval in intervals:
+            overlap = min(end, interval[1]) - max(start, interval[0])
+            if overlap > longestOverlap:
+                longestOverlap = overlap
+                bestSpeaker = speaker
+
+    return bestSpeaker
+
+
+def diarizeAndSlice(audioPath, subPath=None, subOffset=0):
     pipeline = Pipeline.from_pretrained("pyannote/speaker-diarization-3.1",
                                         use_auth_token=config.get('hfToken'))
 
@@ -40,29 +99,60 @@ def diarizeAndSlice(audio_path):
 
     with ProgressHook() as hook:
         diarization = pipeline(
-            audio_path,
+            audioPath,
             min_speakers=config.get('pyannoteSetting').get('min_speakers'),
             max_speakers=config.get('pyannoteSetting').get('max_speakers'),
             hook=hook)
 
-    audio = AudioSegment.from_wav(audio_path)
+    audio = AudioSegment.from_wav(audioPath)
     speakerMap = {}
 
     if os.path.exists(config.get('tempSlicePath')):
         shutil.rmtree(config.get('tempSlicePath'))
         os.makedirs(config.get('tempSlicePath'))
 
-    for turn, _, speaker in diarization.itertracks(yield_label=True):
-        start = int(turn.start * 1000)
-        end = int(turn.end * 1000)
-        speaker_audio = audio[start:end]
+    if subPath:
+        subList = loadAudioEverPartBySub(audioPath, subPath, subOffset)
+        speakerMap2 = {}
+        for turn, _, speaker in diarization.itertracks(yield_label=True):
+            start = int(turn.start * 1000)
+            end = int(turn.end * 1000)
+            if speakerMap2.get(speaker):
+                speakerMap2.get(speaker).append([start, end])
+            else:
+                speakerMap2.setdefault(speaker, [[start, end]])
 
-        if (end - start < int(config.get('minAudioLength'))):
-            continue
-        else:
-            saveSpeakerAudio(speaker, speaker_audio, speakerMap, start, end)
+        for item in subList:
+            audioPart = item.get('audioPart')
+            start = item.get('start')
+            end = item.get('end')
+            bestSpeaker = findBestSpeaker(start=start,
+                                          end=end,
+                                          speakerMap=speakerMap2)
+            if bestSpeaker:
+                saveSpeakerAudio(speaker=bestSpeaker,
+                                 speakerAudio=audioPart,
+                                 speakerMap=speakerMap,
+                                 start=start,
+                                 end=end)
+            else:
+                saveSpeakerAudio(speaker='unset',
+                                 speakerAudio=audioPart,
+                                 speakerMap=speakerMap,
+                                 start=start,
+                                 end=end)
+    else:
+        for turn, _, speaker in diarization.itertracks(yield_label=True):
+            start = int(turn.start * 1000)
+            end = int(turn.end * 1000)
+            speaker_audio = audio[start:end]
+            if (end - start < int(config.get('minAudioLength'))):
+                continue
+            else:
+                saveSpeakerAudio(speaker, speaker_audio, speakerMap, start,
+                                 end)
 
 
 if __name__ == "__main__":
-    filePath = "./test_01.wav"
-    diarizeAndSlice(filePath)
+    audioPath = "./01.ass"
+    loadsub(audioPath)

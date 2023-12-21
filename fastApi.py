@@ -1,7 +1,7 @@
 # main.py
 from http.client import HTTPException
 import json
-from fastapi import FastAPI, UploadFile
+from fastapi import FastAPI, UploadFile, Query
 from fastapi.params import File
 from fastapi.responses import FileResponse
 from pydantic import BaseModel
@@ -10,15 +10,25 @@ import os
 import uvicorn
 from model import *
 from autoslice import diarizeAndSlice
+from fastapi.staticfiles import StaticFiles
 from config import config, updateConfig
 from audioUtils import combineAudioWithSilence, splitAudio, getAudioItems, moveItem, deleteFolder, deleteFiles, renamePath, renameSingleFile
+from fastapi.middleware.cors import CORSMiddleware
 
 app = FastAPI()
+origins = ["*"]
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=origins,
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
 
 
 @app.get("/")
 def read_root():
-    return {"Hello": "World"}
+    return FileResponse("./Web/index.html")
 
 
 @app.post("/createFolder")
@@ -92,14 +102,21 @@ async def listAllHandledAudioItems(request: PageParams):
 
 
 @app.post("/startSliceHandle")
-async def startSliceHandle(file: UploadFile = File(...)):
+async def startSliceHandle(file: UploadFile = File(...),
+                           subFile: UploadFile = File(...),
+                           subOffset: Optional[int] = Query(0)):
     os.makedirs(f"{config.get('uploadPath')}/", exist_ok=True)
     filePath = f"{config.get('uploadPath')}/{file.filename}"
+    subPath = f"{config.get('uploadPath')}/{subFile.filename}"
     with open(filePath, "wb") as buffer:
         for chunk in iter(lambda: file.file.read(4096), b""):
             buffer.write(chunk)
+    if subPath:
+        with open(subPath, "wb") as buffer:
+            for chunk in iter(lambda: subFile.file.read(4096), b""):
+                buffer.write(chunk)
     print('Process start!')
-    diarizeAndSlice(filePath)
+    diarizeAndSlice(filePath, subPath=subPath, subOffset=subOffset)
     return ResponseModel.success()
 
 
@@ -178,5 +195,31 @@ def readFile(filePath: str):
     return FileResponse(filePath)
 
 
+@app.get("/{filePath}")
+def readFile(filePath: str):
+    filePath = f"./Web/{filePath}"
+    return FileResponse(filePath)
+
+
+@app.get("/assets/{filePath}")
+def readFile(filePath: str):
+    filePath = f"./Web/assets/{filePath}"
+    return FileResponse(filePath)
+
+
 if __name__ == "__main__":
-    uvicorn.run(app, host="0.0.0.0", port=7896)
+    staticDir = './Web'
+    dirs = [fir.name for fir in os.scandir(staticDir) if fir.is_dir()]
+    files = [fir.name for fir in os.scandir(staticDir) if fir.is_dir()]
+    if os.path.exists(staticDir):
+        for dirName in dirs:
+            app.mount(
+                f"/{dirName}",
+                StaticFiles(directory=f"./{staticDir}/{dirName}"),
+                name=dirName,
+            )
+    else:
+        print(
+            '挂载静态资源出错，请前往github:https://github.com/ADKcodeXD/Anime-Audio-Dataset-Maker-WEBUI/releases 下载最新打包好的WebUI解压放在根目录下'
+        )
+    uvicorn.run(app, host="localhost", port=7896)
