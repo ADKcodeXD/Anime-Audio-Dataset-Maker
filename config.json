@@ -1,0 +1,20 @@
+{
+    "pyannoteModelSetting": {
+        "clustering": {
+            "method": "centroid",
+            "min_cluster_size": 15,
+            "threshold": 0.541
+        },
+        "segmentation": {
+            "min_duration_off": 0.664
+        }
+    },
+    "pyannoteSetting": {
+        "min_speakers": 2,
+        "max_speakers": 12
+    },
+    "minAudioLength": 300,
+    "tempSlicePath": "tempSlice",
+    "uploadPath": "uploadedPath",
+    "speakerFolderPath": "speakerDataSet"
+}

@@ -107,12 +107,16 @@ def findBestSpeaker(start, end, speakerMap):
 
 
 def diarizeAndSlice(audioPath, subPath=None, subOffset=0, language='JP'):
-    pipeline = Pipeline.from_pretrained("pyannote/speaker-diarization-3.1",
-                                        use_auth_token=config.get('hfToken'))
+    pipeline = Pipeline.from_pretrained("./models/config.yml")
 
     newParams = config.get('pyannoteModelSetting')
     pipeline.instantiate(newParams)
-    pipeline.to(torch.device("cuda"))
+    if not torch.cuda.is_available():
+        print(
+            '检测到本机显卡不可用！切换到CPU模式！！！[EN]Detected the gpu is not available. Using CPU mode!'
+        )
+    device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+    pipeline.to(device)
 
     with ProgressHook() as hook:
         diarization = pipeline(

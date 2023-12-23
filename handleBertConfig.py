@@ -30,9 +30,12 @@ async def process_yaml(filepath, folderName):
     trainPath = data['preprocess_text']['train_path']
     trainFilePath = os.path.join(dataSetPath, trainPath)
     os.makedirs(os.path.dirname(trainFilePath), exist_ok=True)
-
-    for index, filename in enumerate(
-            os.listdir(f"{config.get('speakerFolderPath')}/{folderName}")):
+    index = 1
+    for filename in os.listdir(
+            f"{config.get('speakerFolderPath')}/{folderName}"):
+        name, ext = filename.split('.')
+        if ext not in ('.wav', '.ogg', '.mp3'):
+            continue
         keyName = os.path.join(
             f"{config.get('speakerFolderPath')}/{folderName}", filename)
         newKeyName = f'{folderName}_{index}.wav'
@@ -42,6 +45,7 @@ async def process_yaml(filepath, folderName):
                 line = f"{newKeyName}|{folderName}|{data['language']}|{data['text']}\n"
                 file.write(line)
         shutil.copy(keyName, os.path.join(speakerPath, newKeyName))
+        index += 1
 
     zipName = f'{folderName}.zip'
     zip_directory(dataSetPath, zipName)

@@ -1,6 +1,7 @@
 # main.py
 from http.client import HTTPException
 import json
+import webbrowser
 from fastapi import FastAPI, UploadFile, Query
 from fastapi.params import File
 from fastapi.responses import FileResponse
@@ -16,7 +17,6 @@ from config import config, updateConfig
 from audioUtils import combineAudioWithSilence, splitAudio, getAudioItems, moveItem, deleteFolder, deleteFiles, renamePath, renameSingleFile
 from fastapi.middleware.cors import CORSMiddleware
 from filelist import TextListManager
-import shutil
 
 app = FastAPI()
 origins = ["*"]
@@ -107,18 +107,19 @@ async def listAllHandledAudioItems(request: PageParams):
 @app.post("/startSliceHandle")
 async def startSliceHandle(
         file: UploadFile = File(...),
-        subFile: UploadFile = File(...),
+        subFile: Optional[UploadFile] = None,
         subOffset: Optional[int] = Query(0),
         language: Optional[str] = Query(1),
 ):
     os.makedirs(f"{config.get('uploadPath')}/", exist_ok=True)
     filePath = f"{config.get('uploadPath')}/{file.filename}"
-    subPath = f"{config.get('uploadPath')}/{subFile.filename}"
+    subPath = None  # 初始化为 None
 
     with open(filePath, "wb") as buffer:
         for chunk in iter(lambda: file.file.read(4096), b""):
             buffer.write(chunk)
-    if subPath:
+    if subFile:
+        subPath = f"{config.get('uploadPath')}/{subFile.filename}"
         with open(subPath, "wb") as buffer:
             for chunk in iter(lambda: subFile.file.read(4096), b""):
                 buffer.write(chunk)
@@ -246,4 +247,5 @@ if __name__ == "__main__":
         print(
             '挂载静态资源出错，请前往github:https://github.com/ADKcodeXD/Anime-Audio-Dataset-Maker-WEBUI/releases 下载最新打包好的WebUI解压放在根目录下'
         )
+    webbrowser.open_new("http://localhost:7896")
     uvicorn.run(app, host="localhost", port=7896)
