@@ -7,6 +7,7 @@ from config import config
 import shutil
 import os
 import pysubs2
+from filelist import TextListManager
 
 
 def loadsub(filePath, subOffset=0):
@@ -57,7 +58,14 @@ def convertMillisecondsToHMS(milliseconds):
     return f"{hours:02d}h{minutes:02d}m{seconds:02d}s"
 
 
-def saveSpeakerAudio(speaker, speakerAudio, speakerMap, start, end):
+def saveSpeakerAudio(speaker,
+                     speakerAudio,
+                     speakerMap,
+                     start,
+                     end,
+                     textManager=None,
+                     text=None,
+                     language='JP'):
     speakFolderPath = f"{config.get('tempSlicePath')}/speaker_{speaker}"
     os.makedirs(speakFolderPath, exist_ok=True)
     if speakerMap.get(speaker) is None:
@@ -67,6 +75,15 @@ def saveSpeakerAudio(speaker, speakerAudio, speakerMap, start, end):
 
     speakerFile = f"{speakFolderPath}/{speakerMap.get(speaker)}_{speaker}_{convertMillisecondsToHMS(start)}-{convertMillisecondsToHMS(end)}.wav"
     speakerAudio.export(speakerFile, format="wav")
+
+    if text:
+        if textManager.get(speakFolderPath):
+            textManager.get(speakFolderPath).addNewEntry(
+                speakerFile, text, speaker, language)
+        else:
+            textManager['speakFolderPath'] = TextListManager(speakFolderPath)
+            textManager['speakFolderPath'].addNewEntry(speakerFile, text,
+                                                       speaker, language)
 
 
 def loadAudioEverPartBySub(audioPath, subPath, subOffset):
@@ -89,7 +106,7 @@ def findBestSpeaker(start, end, speakerMap):
     return bestSpeaker
 
 
-def diarizeAndSlice(audioPath, subPath=None, subOffset=0):
+def diarizeAndSlice(audioPath, subPath=None, subOffset=0, language='JP'):
     pipeline = Pipeline.from_pretrained("pyannote/speaker-diarization-3.1",
                                         use_auth_token=config.get('hfToken'))
 
@@ -114,6 +131,7 @@ def diarizeAndSlice(audioPath, subPath=None, subOffset=0):
     if subPath:
         subList = loadAudioEverPartBySub(audioPath, subPath, subOffset)
         speakerMap2 = {}
+        fileMap = {}
         for turn, _, speaker in diarization.itertracks(yield_label=True):
             start = int(turn.start * 1000)
             end = int(turn.end * 1000)
@@ -126,21 +144,18 @@ def diarizeAndSlice(audioPath, subPath=None, subOffset=0):
             audioPart = item.get('audioPart')
             start = item.get('start')
             end = item.get('end')
+            text = item.get('text')
             bestSpeaker = findBestSpeaker(start=start,
                                           end=end,
                                           speakerMap=speakerMap2)
-            if bestSpeaker:
-                saveSpeakerAudio(speaker=bestSpeaker,
-                                 speakerAudio=audioPart,
-                                 speakerMap=speakerMap,
-                                 start=start,
-                                 end=end)
-            else:
-                saveSpeakerAudio(speaker='unset',
-                                 speakerAudio=audioPart,
-                                 speakerMap=speakerMap,
-                                 start=start,
-                                 end=end)
+            saveSpeakerAudio(speaker=bestSpeaker or 'unset',
+                             speakerAudio=audioPart,
+                             speakerMap=speakerMap,
+                             start=start,
+                             end=end,
+                             textManager=fileMap,
+                             text=text,
+                             language=language)
     else:
         for turn, _, speaker in diarization.itertracks(yield_label=True):
             start = int(turn.start * 1000)
@@ -154,5 +169,6 @@ def diarizeAndSlice(audioPath, subPath=None, subOffset=0):
 
 
 if __name__ == "__main__":
-    audioPath = "./01.ass"
-    loadsub(audioPath)
+    audioPath = "./final.wav"
+    srtPath = "./subtitle.srt"
+    diarizeAndSlice(audioPath, srtPath)

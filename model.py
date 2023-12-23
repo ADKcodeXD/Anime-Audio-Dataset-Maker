@@ -73,3 +73,9 @@ class RenamePath(BaseModel):
 class RenameOnePath(BaseModel):
     filePath: str
     customName: str
+
+
+class UpdateText(BaseModel):
+    text: str | None
+    language: str | None
+    filePath: str

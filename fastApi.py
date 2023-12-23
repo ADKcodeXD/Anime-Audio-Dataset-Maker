@@ -8,12 +8,15 @@ from pydantic import BaseModel
 from typing import List
 import os
 import uvicorn
+from handleBertConfig import process_yaml
 from model import *
 from autoslice import diarizeAndSlice
 from fastapi.staticfiles import StaticFiles
 from config import config, updateConfig
 from audioUtils import combineAudioWithSilence, splitAudio, getAudioItems, moveItem, deleteFolder, deleteFiles, renamePath, renameSingleFile
 from fastapi.middleware.cors import CORSMiddleware
+from filelist import TextListManager
+import shutil
 
 app = FastAPI()
 origins = ["*"]
@@ -102,12 +105,16 @@ async def listAllHandledAudioItems(request: PageParams):
 
 
 @app.post("/startSliceHandle")
-async def startSliceHandle(file: UploadFile = File(...),
-                           subFile: UploadFile = File(...),
-                           subOffset: Optional[int] = Query(0)):
+async def startSliceHandle(
+        file: UploadFile = File(...),
+        subFile: UploadFile = File(...),
+        subOffset: Optional[int] = Query(0),
+        language: Optional[str] = Query(1),
+):
     os.makedirs(f"{config.get('uploadPath')}/", exist_ok=True)
     filePath = f"{config.get('uploadPath')}/{file.filename}"
     subPath = f"{config.get('uploadPath')}/{subFile.filename}"
+
     with open(filePath, "wb") as buffer:
         for chunk in iter(lambda: file.file.read(4096), b""):
             buffer.write(chunk)
@@ -116,7 +123,10 @@ async def startSliceHandle(file: UploadFile = File(...),
             for chunk in iter(lambda: subFile.file.read(4096), b""):
                 buffer.write(chunk)
     print('Process start!')
-    diarizeAndSlice(filePath, subPath=subPath, subOffset=subOffset)
+    diarizeAndSlice(filePath,
+                    subPath=subPath,
+                    subOffset=subOffset,
+                    language=language)
     return ResponseModel.success()
 
 
@@ -186,24 +196,38 @@ def renameOneFile(params: RenameOnePath):
         return ResponseModel.unknownError()
 
 
+@app.post("/updateTextOrLanguage")
+def updateTextOrLanguage(params: UpdateText):
+    if os.path.exists(params.filePath):
+        dirName = os.path.dirname(params.filePath)
+        manager = TextListManager(dirName)
+        dictTemp = {}
+        if params.language:
+            dictTemp['language'] = params.language
+        if params.text:
+            dictTemp['text'] = params.text
+        manager.updateEntry(params.filePath, dictTemp)
+    else:
+        return ResponseModel.unknownError()
+
+
+@app.post("/exportByBertConfig")
+async def exportByBertConfig(file: UploadFile = File(...),
+                             folderName=Query(0)):
+    os.makedirs(f"{config.get('uploadPath')}/", exist_ok=True)
+    fileLocation = f"{config.get('uploadPath')}/{file.filename}"
+    with open(fileLocation, "wb+") as file_object:
+        file_object.write(file.file.read())
+
+    return await process_yaml(fileLocation, folderName)
+
+
 @app.get("/files/{filePath:path}")
 def readFile(filePath: str):
     print(filePath)
     if not os.path.isfile(filePath):
         raise HTTPException(status_code=404, detail="File not found")
 
-    return FileResponse(filePath)
-
-
-@app.get("/{filePath}")
-def readFile(filePath: str):
-    filePath = f"./Web/{filePath}"
-    return FileResponse(filePath)
-
-
-@app.get("/assets/{filePath}")
-def readFile(filePath: str):
-    filePath = f"./Web/assets/{filePath}"
     return FileResponse(filePath)
 
 

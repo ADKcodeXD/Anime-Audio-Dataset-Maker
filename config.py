@@ -8,7 +8,7 @@ import os
 filePath = './config.json'
 config: Dict[str, Any] = {}
 defaultConfig = {
-    "hfToken": "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",
+    "hfToken": "",
     "pyannoteModelSetting": {
         "clustering": {
             "method": "centroid",

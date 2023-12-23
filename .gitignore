@@ -8,7 +8,9 @@ web
 .vscode
 __pycache__
 speakerDataSet
+Data
 
+*.zip
 *.ass
 *.srt
 *.mkv

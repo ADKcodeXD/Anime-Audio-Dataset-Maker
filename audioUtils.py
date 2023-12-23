@@ -4,6 +4,7 @@ from pydub.exceptions import CouldntDecodeError
 import os
 import re
 from model import PageParams
+from filelist import TextListManager
 
 
 def naturalSortKey(s):
@@ -19,8 +20,8 @@ def combineAudioWithSilence(audioPaths, interval=200):
         silence = AudioSegment.silent(duration=interval)
         # 遍历所有音频文件路径
         baseDir = os.path.dirname(audioPaths[0])
+        manager = TextListManager(baseDir)
         for path in audioPaths:
-            # 加载当前音频文件
             audio = AudioSegment.from_file(path)
             if combinedAudio is None:
                 combinedAudio = audio
@@ -29,6 +30,7 @@ def combineAudioWithSilence(audioPaths, interval=200):
         firstAudioIndex = re.search(r'(\d+)',
                                     os.path.basename(audioPaths[0])).group()
         outputFileName = f"{baseDir}/{firstAudioIndex}_merge({os.path.basename(path[0])}).wav"
+        manager.mergeSentences(audioPaths, outputFileName)
         combinedAudio.export(outputFileName, format="wav")
         print(f"Saved {outputFileName}")
         for path in audioPaths:
@@ -51,6 +53,7 @@ def splitAudio(audioPath, splitPoint):
         baseDir = os.path.dirname(audioPath)
         firstPart = audio[:splitPoint]
         secondPart = audio[splitPoint:]
+        manager = TextListManager(baseDir)
         # 获取文件名和扩展名
         filename, fileExtension = os.path.splitext(os.path.basename(audioPath))
         # 生成分割后的文件名
@@ -58,9 +61,10 @@ def splitAudio(audioPath, splitPoint):
             baseDir, f"{filename}(split)_1{fileExtension}")
         secondPartFilename = os.path.join(
             baseDir, f"{filename}(split)_2{fileExtension}")
-        # 导出音频文件
         firstPart.export(firstPartFilename, format=fileExtension.strip('.'))
         secondPart.export(secondPartFilename, format=fileExtension.strip('.'))
+        manager.splitSentence(audioPath,
+                              [firstPartFilename, secondPartFilename])
         os.remove(audioPath)
         print(f"音频文件已被分割并保存为 {firstPartFilename} 和 {secondPartFilename}")
         return True
@@ -74,11 +78,11 @@ def getAudioItems(audioFolderPath, pageParams):
     if not os.path.exists(audioFolderPath) or not os.path.isdir(
             audioFolderPath):
         return None
-
     audioFiles = [
         os.path.join(audioFolderPath, f) for f in os.listdir(audioFolderPath)
         if f.lower().endswith(extensions)
     ]
+    textManager = TextListManager(audioFolderPath)
 
     total = len(audioFiles)
     result = []
@@ -89,10 +93,13 @@ def getAudioItems(audioFolderPath, pageParams):
             audio = AudioSegment.from_file(item)
             duration = len(audio)
             totalLength += duration
+            entity = textManager.getData(item)
             result.append({
                 'source': item,
                 'fileName': os.path.basename(item),
-                'duration': duration
+                'duration': duration,
+                'text': entity and entity['text'],
+                'language': entity and entity['language']
             })
         except Exception as e:
             print(f"Error processing file {item}: {e}")
@@ -125,6 +132,20 @@ def moveItem(originFilePath, targetFolder):
     if os.path.exists(os.path.join(targetFolder, fileName)):
         return None
     else:
+        folderName = os.path.dirname(originFilePath)
+        speaker = os.path.basename(folderName)
+
+        originManager = TextListManager(folderName)
+        targetManager = TextListManager(targetFolder)
+
+        newData = originManager.getData(originFilePath)
+
+        basename = os.path.basename(originFilePath)
+        newFilename = os.path.join(targetFolder, basename)
+
+        targetManager.addNewEntry(newFilename, newData['text'], speaker,
+                                  newData['language'])
+        originManager.deleteEntry(originFilePath)
         shutil.move(originFilePath, targetFolder)
         return True
 
@@ -147,15 +168,23 @@ def renamePath(folderPath, customName=""):
     files = sorted(os.listdir(folderPath),
                    key=lambda x: naturalSortKey(os.path.basename(x)))
     index = 1
-    print(files)
+    manager = TextListManager(folderPath)
+
     for filename in files:
         name, ext = os.path.splitext(filename)
-        newFilename = f"{index}_{customName}{ext}"
+        if ext not in ('.wav', '.mp4', 'mp3', 'ogg'):
+            continue
+        newFilename = f"{customName}_{index}{ext}"
         # 生成完整的旧文件路径和新文件路径
         oldFilePath = os.path.join(folderPath, filename)
         newFilePath = os.path.join(folderPath, newFilename)
+        oldData = manager.getData(oldFilePath)
         # 重命名文件
         try:
+            if oldData:
+                manager.addNewEntry(newFilePath, oldData['text'],
+                                    oldData['speaker'], oldData['language'])
+                manager.deleteEntry(oldFilePath)
             os.rename(oldFilePath, newFilePath)
             index += 1
         except OSError as e:
@@ -168,16 +197,15 @@ def renameSingleFile(filePath, customName):
     if not os.path.isfile(filePath):
         print("Provided path is not a file.")
         return False
-
+    dirName = os.path.dirname(filePath)
+    manger = TextListManager(dirName)
     folderPath, _ = os.path.split(filePath)
     _, ext = os.path.splitext(filePath)
-
     # 生成新文件名
     newFilename = f"{customName}{ext}"
-
     # 生成新文件的完整路径
     newFilePath = os.path.join(folderPath, newFilename)
-
+    manger.renameEntry(filePath, newFilePath)
     try:
         os.rename(filePath, newFilePath)
         return True
