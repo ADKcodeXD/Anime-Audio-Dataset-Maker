@@ -179,7 +179,11 @@ def renamePath(folderPath, customName=""):
         oldFilePath = os.path.join(folderPath, filename)
         newFilePath = os.path.join(folderPath, newFilename)
         oldData = manager.getData(oldFilePath)
-        # 重命名文件
+        if os.path.exists(newFilePath):
+            print(
+                f"Warning: File with name {newFilename} already exists. Skipping file."
+            )
+            continue
         try:
             if oldData:
                 manager.addNewEntry(newFilePath, oldData['text'],
