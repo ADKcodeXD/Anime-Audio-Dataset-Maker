@@ -158,6 +158,34 @@ def deleteFolder(targetFolder):
         return True
 
 
+def handleRename(filename, customName, folderPath, manager, index):
+    name, ext = os.path.splitext(filename)
+    if ext not in ('.wav', '.mp4', 'mp3', 'ogg'):
+        return False
+    newFilename = f"{customName}_{index}{ext}"
+    # 生成完整的旧文件路径和新文件路径
+    oldFilePath = os.path.join(folderPath, filename)
+    newFilePath = os.path.join(folderPath, newFilename)
+    oldData = manager.getData(oldFilePath)
+    if os.path.exists(newFilePath):
+        if newFilePath == oldFilePath:
+            return True
+        print(
+            f"Warning: File with name {newFilename} already exists. Skipping file."
+        )
+        return filename
+    try:
+        if oldData:
+            manager.addNewEntry(newFilePath, oldData['text'],
+                                oldData['speaker'], oldData['language'])
+            manager.deleteEntry(oldFilePath)
+        os.rename(oldFilePath, newFilePath)
+    except OSError as e:
+        print(f"Error renaming file {filename}: {e}")
+        return False
+    return True
+
+
 def renamePath(folderPath, customName=""):
     if not os.path.isdir(folderPath):
         print("Provided path is not a directory.")
@@ -169,31 +197,21 @@ def renamePath(folderPath, customName=""):
                    key=lambda x: naturalSortKey(os.path.basename(x)))
     index = 1
     manager = TextListManager(folderPath)
-
+    queue = []
     for filename in files:
-        name, ext = os.path.splitext(filename)
-        if ext not in ('.wav', '.mp4', 'mp3', 'ogg'):
+        res = handleRename(filename, customName, folderPath, manager, index)
+        if res == filename:
+            queue.append(filename)
+        elif res == False:
             continue
-        newFilename = f"{customName}_{index}{ext}"
-        # 生成完整的旧文件路径和新文件路径
-        oldFilePath = os.path.join(folderPath, filename)
-        newFilePath = os.path.join(folderPath, newFilename)
-        oldData = manager.getData(oldFilePath)
-        if os.path.exists(newFilePath):
-            print(
-                f"Warning: File with name {newFilename} already exists. Skipping file."
-            )
-            continue
-        try:
-            if oldData:
-                manager.addNewEntry(newFilePath, oldData['text'],
-                                    oldData['speaker'], oldData['language'])
-                manager.deleteEntry(oldFilePath)
-            os.rename(oldFilePath, newFilePath)
+        else:
             index += 1
-        except OSError as e:
-            print(f"Error renaming file {filename}: {e}")
-            return False
+    for filename in queue:
+        res = handleRename(filename, customName, folderPath, manager, index)
+        if not res:
+            continue
+        else:
+            index += 1
     return True
 
 

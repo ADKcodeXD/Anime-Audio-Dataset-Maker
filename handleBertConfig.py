@@ -17,7 +17,7 @@ def zip_directory(folder_path, zip_name):
                 zipf.write(abs_file_path, rel_file_path)
 
 
-async def process_yaml(filepath, folderName):
+def process_yaml(filepath, folderName):
     with open(filepath, 'r') as file:
         data = yaml.safe_load(file)
     dataSetPath = data['dataset_path']
@@ -34,7 +34,7 @@ async def process_yaml(filepath, folderName):
     for filename in os.listdir(
             f"{config.get('speakerFolderPath')}/{folderName}"):
         name, ext = filename.split('.')
-        if ext not in ('.wav', '.ogg', '.mp3'):
+        if ext not in ('wav', 'ogg', 'mp3'):
             continue
         keyName = os.path.join(
             f"{config.get('speakerFolderPath')}/{folderName}", filename)

@@ -213,14 +213,13 @@ def updateTextOrLanguage(params: UpdateText):
 
 
 @app.post("/exportByBertConfig")
-async def exportByBertConfig(file: UploadFile = File(...),
-                             folderName=Query(0)):
+def exportByBertConfig(file: UploadFile = File(...), folderName=Query(0)):
     os.makedirs(f"{config.get('uploadPath')}/", exist_ok=True)
     fileLocation = f"{config.get('uploadPath')}/{file.filename}"
     with open(fileLocation, "wb+") as file_object:
         file_object.write(file.file.read())
 
-    return await process_yaml(fileLocation, folderName)
+    return process_yaml(fileLocation, folderName)
 
 
 @app.get("/files/{filePath:path}")
