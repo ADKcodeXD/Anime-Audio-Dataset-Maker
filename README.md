@@ -3,6 +3,7 @@
 - [English README](README.md)
 - [中文说明](README_zh.md)
 
+<a href="https://www.bilibili.com/video/BV1VC4y1q7iX">使用演示和说明</a>
 ## Introduce
 
 This project is designed for anime and similar media, aiming to extract character audio quickly and efficiently.
