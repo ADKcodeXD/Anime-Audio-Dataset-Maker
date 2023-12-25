@@ -133,7 +133,8 @@ def moveItem(originFilePath, targetFolder):
         return None
     else:
         folderName = os.path.dirname(originFilePath)
-        speaker = os.path.basename(folderName)
+        targetFolderName = os.path.dirname(targetFolder)
+        speaker = os.path.basename(targetFolderName)
 
         originManager = TextListManager(folderName)
         targetManager = TextListManager(targetFolder)
@@ -161,7 +162,7 @@ def deleteFolder(targetFolder):
 def handleRename(filename, customName, folderPath, manager, index):
     name, ext = os.path.splitext(filename)
     if ext not in ('.wav', '.mp4', 'mp3', 'ogg'):
-        return False
+        return 'invalid'
     newFilename = f"{customName}_{index}{ext}"
     # 生成完整的旧文件路径和新文件路径
     oldFilePath = os.path.join(folderPath, filename)
@@ -169,15 +170,17 @@ def handleRename(filename, customName, folderPath, manager, index):
     oldData = manager.getData(oldFilePath)
     if os.path.exists(newFilePath):
         if newFilePath == oldFilePath:
-            return True
-        print(
-            f"Warning: File with name {newFilename} already exists. Skipping file."
-        )
-        return filename
+            print(
+                f"Warning: File with name {newFilename} already exists. Skipping file."
+            )
+            return 'skip'
+        else:
+            # 说明不是相同的 那就是应该放入队列中
+            return 'queue'
     try:
         if oldData:
-            manager.addNewEntry(newFilePath, oldData['text'],
-                                oldData['speaker'], oldData['language'])
+            manager.addNewEntry(newFilePath, oldData['text'], customName,
+                                oldData['language'])
             manager.deleteEntry(oldFilePath)
         os.rename(oldFilePath, newFilePath)
     except OSError as e:
@@ -200,15 +203,21 @@ def renamePath(folderPath, customName=""):
     queue = []
     for filename in files:
         res = handleRename(filename, customName, folderPath, manager, index)
-        if res == filename:
+        if res == 'queue':
             queue.append(filename)
-        elif res == False:
+        elif res == 'skip':
+            index += 1
+            continue
+        elif res == 'invalid':
             continue
         else:
             index += 1
     for filename in queue:
         res = handleRename(filename, customName, folderPath, manager, index)
-        if not res:
+        if res == 'skip':
+            index += 1
+            continue
+        elif res == 'invalid':
             continue
         else:
             index += 1
