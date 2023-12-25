@@ -83,6 +83,7 @@ class TextListManager:
             'language': language
         }
         self.writeData()
+        return True
 
     def mergeSentences(self, filenames, newFilename):
         mergedText = ''
@@ -122,6 +123,16 @@ class TextListManager:
             # 删除原始文件名对应的条目
             del self.data[filename]
             # 将更改写入文件
+            self.writeData()
+
+    def cleanSentence(self):
+        keysToDelete = []
+        for filename in self.data:
+            if not os.path.exists(filename) or not os.path.isfile(filename):
+                keysToDelete.append(filename)
+        for key in keysToDelete:
+            del self.data[key]
+        if keysToDelete:
             self.writeData()
 
     def writeData(self):

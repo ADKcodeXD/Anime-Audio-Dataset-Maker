@@ -161,7 +161,7 @@ def deleteFolder(targetFolder):
 
 def handleRename(filename, customName, folderPath, manager, index):
     name, ext = os.path.splitext(filename)
-    if ext not in ('.wav', '.mp4', 'mp3', 'ogg'):
+    if ext not in ('.wav', '.mp4', '.mp3', '.ogg'):
         return 'invalid'
     newFilename = f"{customName}_{index}{ext}"
     # 生成完整的旧文件路径和新文件路径
@@ -181,7 +181,6 @@ def handleRename(filename, customName, folderPath, manager, index):
         if oldData:
             manager.addNewEntry(newFilePath, oldData['text'], customName,
                                 oldData['language'])
-            manager.deleteEntry(oldFilePath)
         os.rename(oldFilePath, newFilePath)
     except OSError as e:
         print(f"Error renaming file {filename}: {e}")
@@ -221,6 +220,7 @@ def renamePath(folderPath, customName=""):
             continue
         else:
             index += 1
+    manager.cleanSentence()
     return True
 
 
