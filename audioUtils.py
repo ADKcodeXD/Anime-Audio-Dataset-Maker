@@ -29,7 +29,10 @@ def combineAudioWithSilence(audioPaths, interval=200):
                 combinedAudio += silence + audio
         firstAudioIndex = re.search(r'(\d+)',
                                     os.path.basename(audioPaths[0])).group()
-        outputFileName = f"{baseDir}/{firstAudioIndex}_merge({os.path.basename(path[0])}).wav"
+        outputFileName = f"{baseDir}/{firstAudioIndex}_merge({os.path.basename(audioPaths[0])}).wav"
+        while os.path.exists(outputFileName):
+            firstAudioIndex += 1
+            outputFileName = f"{baseDir}/{firstAudioIndex}_merge({os.path.basename(audioPaths[0])}).wav"
         manager.mergeSentences(audioPaths, outputFileName)
         combinedAudio.export(outputFileName, format="wav")
         print(f"Saved {outputFileName}")
