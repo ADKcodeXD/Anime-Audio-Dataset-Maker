@@ -62,7 +62,7 @@ class SpliceRequest(BaseModel):
 
 class MoveAudio(BaseModel):
     paths: List[str]
-    targetFolderName: str | None
+    targetFolderPath: str | None
 
 
 class RenamePath(BaseModel):

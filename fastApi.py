@@ -147,7 +147,7 @@ def splitAudioFn(params: SpliceRequest):
 
 @app.post("/moveAudio")
 def moveAudioFn(params: MoveAudio):
-    targetPath = f"{config.get('speakerFolderPath')}/{params.targetFolderName}"
+    targetPath = params.targetFolderPath
     flag = True
     if not os.path.exists(targetPath):
         return ResponseModel.notFoundError()
