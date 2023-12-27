@@ -21,13 +21,13 @@ def process_yaml(filepath, folderName):
     with open(filepath, 'r') as file:
         data = yaml.safe_load(file)
     dataSetPath = data['dataset_path']
+    dataSetPath = dataSetPath.replace('\\', '/')
     outDir = data['resample']['out_dir']
     speakerPath = os.path.join(dataSetPath, outDir, folderName)
     os.makedirs(speakerPath, exist_ok=True)
     manager = TextListManager(
         f"{config.get('speakerFolderPath')}/{folderName}")
-
-    trainPath = data['preprocess_text']['train_path']
+    trainPath = data['preprocess_text']['transcription_path']
     trainFilePath = os.path.join(dataSetPath, trainPath)
     os.makedirs(os.path.dirname(trainFilePath), exist_ok=True)
     index = 1
@@ -42,7 +42,7 @@ def process_yaml(filepath, folderName):
         with open(trainFilePath, 'a', encoding='utf-8') as file:
             data = manager.getData(keyName)
             if data:
-                line = f"{outDir}/{newKeyName}|{folderName}|{data['language']}|{data['text']}\n"
+                line = f"./{dataSetPath}/{outDir}/{newKeyName}|{folderName}|{data['language']}|{data['text']}\n"
                 file.write(line)
         shutil.copy(keyName, os.path.join(speakerPath, newKeyName))
         index += 1
