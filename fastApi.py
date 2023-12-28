@@ -14,7 +14,7 @@ from model import *
 from autoslice import diarizeAndSlice
 from fastapi.staticfiles import StaticFiles
 from config import config, updateConfig
-from audioUtils import combineAudioWithSilence, splitAudio, getAudioItems, moveItem, deleteFolder, deleteFiles, renamePath, renameSingleFile
+from audioUtils import combineAudioWithSilence, splitAudio, getAudioItems, moveItem, deleteFolderUtils, deleteFiles, renamePath, renameSingleFile, renameFolderAndEntries
 from fastapi.middleware.cors import CORSMiddleware
 from filelist import TextListManager
 
@@ -36,12 +36,9 @@ def read_root():
 
 @app.post("/createFolder")
 async def createFolder(request: FolderRequest):
-    baseDir = f"{config.get('speakerFolderPath')}"
-    folderPath = os.path.join(baseDir, request.folderName)
-
+    folderPath = request.folderPath
     if os.path.exists(folderPath):
-        return ResponseModel.unknownError()
-
+        return ResponseModel.alreadyExist()
     os.makedirs(folderPath, exist_ok=True)
     return ResponseModel.success()
 
@@ -60,7 +57,7 @@ async def updateConfigFn(request: ConfigRequest):
         print(f"Error: not correct Json Schema {e}")
         return ResponseModel.unknownError()
     except Exception as e:
-        return ResponseModel.unknownError()
+        return ResponseModel.unknownError(e)
     return ResponseModel.success(config)
 
 
@@ -104,6 +101,12 @@ async def listAllHandledAudioItems(request: PageParams):
         getAudioItems(audioFolderPath=baseDir, pageParams=request))
 
 
+@app.post("/listAllAudioByFolderPath")
+async def listAllHandledAudioItems(request: PageParams):
+    return ResponseModel.success(
+        getAudioItems(audioFolderPath=request.folderPath, pageParams=request))
+
+
 @app.post("/startSliceHandle")
 async def startSliceHandle(
         file: UploadFile = File(...),
@@ -141,7 +144,7 @@ async def mergeAudio(params: MergeRequest):
 @app.post("/splitAudio")
 def splitAudioFn(params: SpliceRequest):
     if not splitAudio(params.path, params.splitPoint):
-        return ResponseModel.unknownError()
+        return ResponseModel.alreadyExist()
     return ResponseModel.success()
 
 
@@ -156,16 +159,15 @@ def moveAudioFn(params: MoveAudio):
             flag = False
             break
     if not flag:
-        return ResponseModel.notFoundError()
+        return ResponseModel.alreadyExist()
     return ResponseModel.success()
 
 
-@app.post("/deleteSpeakerFolder")
-def deleteSpeakerFolder(params: FolderRequest):
-    targetPath = f"{config.get('speakerFolderPath')}/{params.folderName}"
-    if not os.path.exists(targetPath):
+@app.post("/deleteFolder")
+def deleteFolder(params: FolderRequest):
+    if not os.path.exists(params.folderPath):
         return ResponseModel.notFoundError()
-    if (deleteFolder(targetFolder=targetPath)):
+    if (deleteFolderUtils(targetFolder=params.folderPath)):
         return ResponseModel.success()
     else:
         return ResponseModel.notFoundError()
@@ -185,7 +187,7 @@ def renamePathAllFiles(params: RenamePath):
                    customName=params.customName)):
         return ResponseModel.success()
     else:
-        return ResponseModel.unknownError()
+        return ResponseModel.moveError()
 
 
 @app.post("/renameOneFile")
@@ -194,7 +196,16 @@ def renameOneFile(params: RenameOnePath):
                          customName=params.customName)):
         return ResponseModel.success()
     else:
-        return ResponseModel.unknownError()
+        return ResponseModel.alreadyExist()
+
+
+@app.post("/renameFolder")
+def renameFolder(params: RenameOnefolder):
+    if (renameFolderAndEntries(oldFolderPath=params.oldFolderPath,
+                               newFolderName=params.newFolderName)):
+        return ResponseModel.success()
+    else:
+        return ResponseModel.alreadyExist()
 
 
 @app.post("/updateTextOrLanguage")

@@ -1,4 +1,6 @@
 import shutil
+from typing import List
+from altair import Dict
 from pydub import AudioSegment
 from pydub.exceptions import CouldntDecodeError
 import os
@@ -108,13 +110,11 @@ def getAudioItems(audioFolderPath, pageParams):
             print(f"Error processing file {item}: {e}")
             return None
 
-    # 根据音频时长排序
     if pageParams.order == 'ascend':
         result = sorted(result, key=lambda x: x['duration'])
     elif pageParams.order == 'descend':
         result = sorted(result, key=lambda x: x['duration'], reverse=True)
     else:
-        # 如果没有指定排序方式或排序方式无效，则按文件名排序
         result = sorted(result, key=lambda x: naturalSortKey(x['fileName']))
     # 分页处理
     if (pageParams.page - 1) * pageParams.pageSize > len(audioFiles):
@@ -154,7 +154,7 @@ def moveItem(originFilePath, targetFolder):
         return True
 
 
-def deleteFolder(targetFolder):
+def deleteFolderUtils(targetFolder):
     if not os.path.exists(targetFolder) or not os.path.isdir(targetFolder):
         return None
     else:
@@ -254,4 +254,33 @@ def deleteFiles(filePaths):
             raise FileNotFoundError
         else:
             os.remove(path)
+    return True
+
+
+def renameFolderAndEntries(oldFolderPath, newFolderName):
+    if not os.path.isdir(oldFolderPath):
+        print("Provided path is not a directory.")
+        return False
+
+    parentDir = os.path.dirname(oldFolderPath)
+    newFolderPath = os.path.join(parentDir, newFolderName)
+
+    try:
+        shutil.move(oldFolderPath, newFolderPath)
+    except OSError as e:
+        print(f"Error renaming folder: {e}")
+        return False
+
+    manager = TextListManager(newFolderPath)
+    items = manager.data.items()
+    toBeAdd: List[dict[str, dict]] = []
+    for oldPath, data in items:
+        fileName = os.path.basename(oldPath)
+        newFilePath = os.path.join(newFolderPath, fileName)
+        toBeAdd.append({newFilePath: data})
+    for tempData in toBeAdd:
+        (key, value), = tempData.items()
+        manager.addNewEntry(key, value['text'], value['speaker'],
+                            value['language'])
+    manager.cleanSentence()
     return True

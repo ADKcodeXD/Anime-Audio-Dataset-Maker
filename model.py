@@ -22,6 +22,22 @@ class ResponseModel(Generic[T], BaseModel):
         return ResponseModel(code=501, msg='参数错误', data=data)
 
     @staticmethod
+    def alreadyExist(data: T = None) -> 'ResponseModel[T]':
+        return ResponseModel(code=502, msg='文件或文件夹已存在', data=data)
+
+    @staticmethod
+    def renameError(data: T = None) -> 'ResponseModel[T]':
+        return ResponseModel(code=503, msg='文件重命名出错', data=data)
+
+    @staticmethod
+    def moveError(data: T = None) -> 'ResponseModel[T]':
+        return ResponseModel(code=504, msg='目标文件夹存在同名文件', data=data)
+
+    @staticmethod
+    def handleError(data: T = None) -> 'ResponseModel[T]':
+        return ResponseModel(code=505, msg='处理时出错，请重试', data=data)
+
+    @staticmethod
     def notFoundError(data: T = None) -> 'ResponseModel[T]':
         return ResponseModel(code=404, msg='文件或文件夹未找到', data=data)
 
@@ -31,7 +47,7 @@ class ResponseModel(Generic[T], BaseModel):
 
 
 class FolderRequest(BaseModel):
-    folderName: str
+    folderPath: str
 
 
 class ConfigRequest(BaseModel):
@@ -42,6 +58,7 @@ class PageParams(BaseModel):
     pageSize: int = 100
     page: int = 1
     folderName: str | None
+    folderPath: str | None
     keyword: str | None
     order: str | None
 
@@ -73,6 +90,11 @@ class RenamePath(BaseModel):
 class RenameOnePath(BaseModel):
     filePath: str
     customName: str
+
+
+class RenameOnefolder(BaseModel):
+    oldFolderPath: str
+    newFolderName: str
 
 
 class UpdateText(BaseModel):
