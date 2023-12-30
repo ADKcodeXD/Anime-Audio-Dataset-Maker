@@ -42,7 +42,7 @@ def process_yaml(filepath, folderName):
         with open(trainFilePath, 'a', encoding='utf-8') as file:
             data = manager.getData(keyName)
             if data:
-                line = f"./{dataSetPath}/{outDir}/{newKeyName}|{folderName}|{data['language']}|{data['text']}\n"
+                line = f"./{dataSetPath}/{outDir}/{folderName}/{newKeyName}|{folderName}|{data['language']}|{data['text']}\n"
                 file.write(line)
         shutil.copy(keyName, os.path.join(speakerPath, newKeyName))
         index += 1
