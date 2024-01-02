@@ -5,6 +5,8 @@ import shutil
 from zipfile import ZipFile
 from filelist import TextListManager
 from config import config
+import librosa
+import soundfile as sf
 
 
 def zip_directory(folder_path, zip_name):
@@ -40,11 +42,16 @@ def process_yaml(filepath, folderName):
             f"{config.get('speakerFolderPath')}/{folderName}", filename)
         newKeyName = f'{folderName}_{index}.wav'
         with open(trainFilePath, 'a', encoding='utf-8') as file:
-            data = manager.getData(keyName)
-            if data:
-                line = f"./{dataSetPath}/{outDir}/{folderName}/{newKeyName}|{folderName}|{data['language']}|{data['text']}\n"
+            audioTextData = manager.getData(keyName)
+            if audioTextData:
+                filterText = audioTextData['text'].replace('\u3000', '、')
+                line = f"./{dataSetPath}/{outDir}/{folderName}/{newKeyName}|{folderName}|{audioTextData['language']}|{filterText}\n"
                 file.write(line)
-        shutil.copy(keyName, os.path.join(speakerPath, newKeyName))
+        y, sr = librosa.load(keyName, sr=None)
+        y_resampled = librosa.resample(
+            y, orig_sr=sr, target_sr=data['resample']['sampling_rate'])
+        sf.write(os.path.join(speakerPath, newKeyName), y_resampled,
+                 data['resample']['sampling_rate'])
         index += 1
 
     zipName = f'{folderName}.zip'
