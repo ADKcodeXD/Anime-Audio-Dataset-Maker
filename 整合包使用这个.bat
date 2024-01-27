@@ -1,4 +1,4 @@
 @echo off
 echo Starting FastAPI application...
-python fastApi.py
+./runtime/Scripts/python.exe fastApi.py
 pause

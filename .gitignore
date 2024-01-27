@@ -9,6 +9,7 @@ web
 __pycache__
 speakerDataSet
 Data
+runtime
 
 *.zip
 *.ass
